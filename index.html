@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>记牌器</title>
+  <style>
+    #box {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: stretch;
+      user-select: none;
+      padding: 10px;
+    }
+
+    .card {
+      position: relative;
+      border-radius: 10px;
+      width: 100px;
+      height: 160px;
+      background-color: #f5f5f5;
+      margin: 5px;
+      box-shadow: 0 5px 5px 0 #c9c9c9;
+      font-size: 36px;
+      /* 增大字体大小 */
+      display: flex;
+      flex-direction: column;
+      /* 垂直布局 */
+      align-items: center;
+      justify-content: space-between;
+      /* 顶部居中数字，底部按钮 */
+      padding: 0;
+      /* 去掉多余间距 */
+      text-align: center;
+    }
+
+    .card--empty {
+      color: #c3c3c3;
+      opacity: 0.8;
+    }
+
+    .card--chosen {
+      margin-top: 0;
+    }
+
+    .btn-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: auto;
+      /* 自动向底部推 */
+      padding-bottom: 10px;
+      /* 与卡片底部留一定间距 */
+    }
+
+    .ctrl-btn {
+      background-color: transparent;
+      color: darkred;
+      border: none;
+      font-size: 18px;
+      padding: 1px;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      outline: none;
+      margin: 0 5px;
+    }
+
+    .ctrl-btn:active {
+      transform: scale(0.9);
+    }
+
+    .ctrl-btn:hover {
+      color: red;
+    }
+
+    .card--warning .card-count {
+      color: darkred;
+      font-weight: bold;
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        width: 30%;
+        /* 动态调整宽度以适应屏幕 */
+        height: auto;
+        padding-bottom: 10px;
+      }
+
+      .ctrl-btn {
+        font-size: 20px;
+        /* 调整按钮大小使之适合屏幕 */
+      }
+
+      .card-count {
+        font-size: 20px;
+        /* 同样调整字号 */
+      }
+    }
+
+    .info {
+      font-size: 14px;
+      text-align: center;
+      color: #999;
+      margin-top: 20px;
+      /* 调整间距以适应不同屏幕 */
+    }
+
+    .input-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    #cardInput {
+      width: 80%;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      outline: none;
+    }
+
+    .card-count {
+      font-size: 18px;
+      font-weight: bold;
+      transition: color 0.3s ease;
+    }
+
+    .card-value {
+      position: absolute;
+      top: 45%;
+      /* 垂直居中 */
+      left: 50%;
+      /* 水平居中 */
+      transform: translate(-50%, -50%);
+      /* 调整居中偏移 */
+      font-size: 48px;
+      /* 字体大小 */
+      font-weight: bold;
+      /* 加粗显示 */
+      color: black;
+      /* 数字颜色 */
+      pointer-events: none;
+      /* 禁止交互，防止影响按钮点击 */
+    }
+
+    /* 数字与按钮的颜色定义 */
+    /* 深红色（库存 > 4） */
+    .card.high .card-count,
+    .card.high .ctrl-btn {
+      color: darkred;
+    }
+
+    /* 红色（库存 = 4） */
+    .card.medium .card-count,
+    .card.medium .ctrl-btn {
+      color: red;
+    }
+
+    /* 深黄色（库存 <= 4 且 > 0） */
+    .card.low .card-count,
+    .card.low .ctrl-btn {
+      color: #ffc72c;
+    }
+
+    /* 绿色（库存 = 0） */
+    .card.empty .card-count,
+    .card.empty .ctrl-btn {
+      color: green;
+    }
+
+    /* 按钮点击和悬停效果保持 */
+    .ctrl-btn:active {
+      transform: scale(0.9);
+    }
+
+    #resetBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #f5f5f5;
+      color: darkred;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    #resetBtn:hover {
+      background-color: #ffc72c;
+    }
+
+    #analysisBox {
+      padding: 10px;
+      border: 1px solid #ccc;
+      margin-bottom: 20px;
+      font-size: 16px;
+      color: #333;
+      background-color: #f9f9f9;
+    }
+
+    #analysisBox p {
+      margin: 5px 0;
+    }
+  </style>
+
+  <title>一键截图并识别</title>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.js"></script>
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+</head>
+
+<body>
+  <div id="box"></div>
+  <div class="info">
+    <p>作者: <a href="http://www.leelei.info">GPT + wswsws125</a></p>
+    <p>用法: 【点击】箭头增减牌，或直接输入牌点</p>
+    <div class="input-container">
+      <input id="cardInput" type="text" placeholder="输入牌点（如555666或kk），按回车减去库存">
+
+
+      <button id="captureButton">一键截图并识别</button>
+      <p id="ocrResult">识别结果：</p>
+      <script>
+        document.getElementById('captureButton').addEventListener('click', async () => {
+          try {
+            // 使用 html2canvas 截图
+            const canvas = await html2canvas(document.body); // 截图整个页面
+            const imageData = canvas.toDataURL('image/png'); // 转换为 PNG 图片
+
+            // 显示加载状态
+            document.getElementById('ocrResult').innerText = '正在识别，请稍候...';
+
+            // 使用 tesseract.js 进行 OCR 识别
+            const worker = Tesseract.createWorker(); // 创建 Worker
+            await worker.loadLanguage('eng'); // 加载语言包
+            await worker.initialize('eng'); // 初始化语言
+
+            const { data: { text } } = await worker.recognize(imageData); // 识别图片
+            document.getElementById('ocrResult').innerText = `识别结果：\n${text}`; // 显示结果
+
+            await worker.terminate(); // 结束任务
+          } catch (error) {
+            console.error('截图或识别失败', error);
+            document.getElementById('ocrResult').innerText = '识别失败，请重试。';
+          }
+        });
+
+      </script>
+
+    </div>
+    <br>
+    <div id="analysisBox">
+      <p><strong>对手可能存在的大牌：</strong></p>
+      <p id="threePairs">三连对：</p>
+      <p id="steelPlates">钢板：</p>
+      <p id="sequences">顺子：</p>
+      <p id="fourBombs">四炸：</p>
+      <p id="fiveBombs">五炸：</p>
+      <p id="sixBombs">六炸：</p>
+      <p id="sevenBombs">七炸：</p>
+      <p id="eightBombs">八炸：</p>
+      <p id="heavenlyKingBomb">天王炸：无</p> <!-- 新增 -->
+    </div>
+
+    <button id="resetBtn">Reset</button>
+
+  </div>
+
+  <script>
+    // 定义卡片数据结构，将牌点和库存绑定在一起
+    const cards = {
+      '👑': 2, // 大王
+      '⚔': 2, // 小王
+      'A': 8,
+      'K': 8,
+      'Q': 8,
+      'J': 8,
+      '10': 8,
+      '9': 8,
+      '8': 8,
+      '7': 8,
+      '6': 8,
+      '5': 8,
+      '4': 8,
+      '3': 8,
+      '2': 8,
+    };
+
+    // 定义牌点的显示顺序
+    const cardOrder = ['👑', '⚔', 'A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
+
+    const maxNums = [2, 2, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]; // 每张牌的最大张数
+    const nums = [...maxNums]; // 当前张数数组，初始化为最大张数
+    const TYPE_CHOSEN = ' card--chosen';
+    const TYPE_WARNING = ' card--warning';
+    const TYPE_EMPTY = ' card--empty';
+    let levelCard = null; // 定义级牌的全局变量
+
+
+    function addClass(e, name) {
+      if (e.className.indexOf(name) === -1) {
+        e.className += name;
+      }
+    }
+
+    function removeClass(e, name) {
+      e.className = e.className.replace(name, '');
+    }
+
+    function initCards() {
+      let box = document.getElementById('box');
+      let frag = document.createDocumentFragment();
+
+      // 按照 cardOrder 的顺序遍历
+      for (let cardName of cardOrder) {
+        if (!cards[cardName]) continue; // 如果 cards 中没有这个牌，跳过
+
+        let ele = document.createElement('div');
+        ele.className = 'card high'; // 默认高库存
+        ele.setAttribute('data-card', cardName); // 使用卡片名称作为标识
+
+        // 添加牌面数字
+        let faceValue = document.createElement('span');
+        faceValue.className = 'card-value';
+        faceValue.innerText = cardName;
+        ele.appendChild(faceValue);
+
+        // 创建按钮容器
+        let btnContainer = document.createElement('div');
+        btnContainer.className = 'btn-container';
+
+        // 添加增加按钮
+        let increaseBtn = document.createElement('button');
+        increaseBtn.className = 'ctrl-btn';
+        increaseBtn.innerHTML = '&#9650;'; // 上箭头
+        increaseBtn.addEventListener('click', () => changeCount(ele, 1)); // 增加数量
+
+        // 添加显示当前数量
+        let countDisplay = document.createElement('span');
+        countDisplay.className = 'card-count';
+        countDisplay.innerText = cards[cardName];
+
+        // 添加减少按钮
+        let decreaseBtn = document.createElement('button');
+        decreaseBtn.className = 'ctrl-btn';
+        decreaseBtn.innerHTML = '&#9660;'; // 下箭头
+        decreaseBtn.addEventListener('click', () => changeCount(ele, -1)); // 减少数量
+
+        // 将按钮添加到容器
+        btnContainer.appendChild(increaseBtn);
+        btnContainer.appendChild(countDisplay);
+        btnContainer.appendChild(decreaseBtn);
+        ele.appendChild(btnContainer);
+
+        // 添加卡片到文档片段
+        frag.appendChild(ele);
+      }
+
+      // 添加所有卡片到页面
+      box.appendChild(frag);
+
+      // 调用分析方法，更新牌组信息
+      analyzeRemainingCards();
+    }
+
+
+    function changeCount(card, delta) {
+      let countDisplay = card.querySelector('.card-count');
+      let faceValue = card.querySelector('.card-value'); // 卡片的牌值显示
+      let increaseBtn = card.querySelector('.ctrl-btn:nth-child(1)'); // 获取上箭头按钮
+      let decreaseBtn = card.querySelector('.ctrl-btn:nth-child(3)'); // 获取下箭头按钮
+      let cardValue = card.querySelector('.card-value').innerText; // 获取当前牌的名称
+      let cardIndex = cardOrder.indexOf(cardValue); // 从 cardOrder 获取索引
+      let newCount = cards[cardValue] + delta; // 根据牌名从 cards 对象中调整数量
+
+      // 检查是否在有效范围内
+      if (newCount >= 0 && newCount <= maxNums[cardIndex]) { // 使用正确的索引
+        cards[cardValue] = newCount; // 更新当前张数
+        countDisplay.innerText = newCount; // 更新卡片显示的数字
+        card.setAttribute('count', newCount); // 更新卡片属性值
+
+        // 更新颜色类
+        card.classList.remove('high', 'medium', 'low', 'empty');
+        if (newCount > 4) {
+          card.classList.add('high'); // 深红色
+        } else if (newCount == 4) {
+          card.classList.add('medium'); // 红色
+        } else if (newCount > 0) {
+          card.classList.add('low'); // 黄色
+        } else {
+          card.classList.add('empty'); // 绿色
+        }
+
+        // 更新样式
+        if (newCount == 0) {
+          card.classList.add('empty'); // 添加空库存类
+          faceValue.style.color = 'lightgray'; // 调整牌值颜色
+          countDisplay.style.color = 'lightgray'; // 调整数字颜色
+          increaseBtn.style.color = 'lightgray'; // 调整上箭头颜色
+          decreaseBtn.style.color = 'lightgray'; // 调整下箭头颜色
+        } else {
+          card.classList.remove('empty'); // 移除空库存类
+          countDisplay.style.color = ''; // 恢复默认颜色
+          faceValue.style.color = ''; // 恢复牌值颜色
+          increaseBtn.style.color = ''; // 恢复上箭头颜色
+          decreaseBtn.style.color = ''; // 恢复下箭头颜色
+        }
+
+
+        // 调用分析方法更新显示
+        analyzeRemainingCards();
+      }
+    }
+
+    function handleInput(event) {
+      if (event.key === "Enter") {
+        const input = event.target.value.trim().toUpperCase(); // 将输入转换为大写
+
+        // 定义特殊映射规则
+        const specialMap = {
+          '1': 'A',  // 1 代表 A
+          'D': '👑', // D 代表大王
+          'X': '⚔', // X 代表小王
+          'S': '10'  // S 代表 10
+        };
+
+        // 转换输入，将特殊字符替换为对应牌点
+        const normalizedInput = [...input].map(char => specialMap[char] || char);
+
+        // 初始化输入统计
+        const inputCounts = {};
+
+        // 遍历输入，统计每种牌点的数量
+        for (let char of normalizedInput) {
+          if (cards[char] !== undefined) {
+            inputCounts[char] = (inputCounts[char] || 0) + 1;
+          } else {
+            alert(`无效输入: ${char}`);
+            return; // 遇到无效输入直接返回
+          }
+        }
+
+        // 检查库存是否足够
+        for (let card in inputCounts) {
+          if (inputCounts[card] > cards[card]) {
+            alert(`库存不足: ${card} (${inputCounts[card]} 张需要，库存仅有 ${cards[card]} 张)`);
+            return;
+          }
+        }
+
+        // 更新库存
+        for (let card in inputCounts) {
+          cards[card] -= inputCounts[card]; // 减库存
+          updateCardUI(card); // 更新 UI
+        }
+
+        event.target.value = ""; // 清空输入框
+
+        // 调用分析方法，更新牌组信息
+        analyzeRemainingCards();
+      }
+    }
+
+    // 更新单张卡片的 UI
+    function updateCardUI(card) {
+      const cardElement = document.querySelector(`.card[data-card="${card}"]`);
+      const countElement = cardElement.querySelector('.card-count');
+      countElement.textContent = cards[card];
+
+      // 更新颜色状态
+      cardElement.classList.remove('high', 'medium', 'low', 'empty');
+      if (cards[card] > 4) {
+        cardElement.classList.add('high');
+      } else if (cards[card] === 4) {
+        cardElement.classList.add('medium');
+      } else if (cards[card] > 0) {
+        cardElement.classList.add('low');
+      } else {
+        cardElement.classList.add('empty');
+      }
+    }
+
+    function analyzeRemainingCards() {
+      // 获取剩余牌的数量，转为数组以便遍历
+      const remainingCounts = Object.entries(cards)
+        .map(([card, count]) => ({ card, count }));
+
+      // 推测三连对
+      const threePairs = [];
+      for (let i = 2; i <= cardOrder.length - 3; i++) { // 遍历连续三对
+        if (
+          cards[cardOrder[i]] >= 2 &&
+          cards[cardOrder[i + 1]] >= 2 &&
+          cards[cardOrder[i + 2]] >= 2
+        ) {
+          const triplet = [
+            cardOrder[i], cardOrder[i],
+            cardOrder[i + 1], cardOrder[i + 1],
+            cardOrder[i + 2], cardOrder[i + 2],
+          ];
+          threePairs.push(sortByCardOrder(triplet).join(''));
+        }
+      }
+
+      // 推测钢板
+      const steelPlates = [];
+      for (let i = 2; i <= cardOrder.length - 2; i++) { // 遍历连续两组三张
+        if (
+          cards[cardOrder[i]] >= 3 &&
+          cards[cardOrder[i + 1]] >= 3
+        ) {
+          const plate = [
+            cardOrder[i], cardOrder[i], cardOrder[i],
+            cardOrder[i + 1], cardOrder[i + 1], cardOrder[i + 1],
+          ];
+          steelPlates.push(sortByCardOrder(plate).join(''));
+        }
+      }
+
+      // 推测顺子
+      const sequences = [];
+      for (let i = 2; i <= cardOrder.length - 5; i++) { // 遍历顺子（连续五张）
+        if (
+          cards[cardOrder[i]] >= 1 &&
+          cards[cardOrder[i + 1]] >= 1 &&
+          cards[cardOrder[i + 2]] >= 1 &&
+          cards[cardOrder[i + 3]] >= 1 &&
+          cards[cardOrder[i + 4]] >= 1
+        ) {
+          const sequence = [
+            cardOrder[i],
+            cardOrder[i + 1],
+            cardOrder[i + 2],
+            cardOrder[i + 3],
+            cardOrder[i + 4],
+          ];
+          sequences.push(sortByCardOrder(sequence).join(''));
+        }
+      }
+
+      // 更新天王炸显示
+      analyzeHeavenlyKingBomb();
+
+      // 更新炸弹显示
+      updateBombsDisplay();
+
+      // 更新页面显示
+      document.getElementById('threePairs').innerText = `三连对：${threePairs.join(', ') || '无'}`;
+      document.getElementById('steelPlates').innerText = `钢板：${steelPlates.join(', ') || '无'}`;
+      document.getElementById('sequences').innerText = `顺子：${sequences.join(', ') || '无'}`;
+    }
+
+    function getBombs(n) {
+      // 获取指定数量的炸弹
+      return Object.entries(cards)
+        .filter(([_, count]) => count >= n)
+        .map(([card, count]) => `${n}个${card}`);
+    }
+
+    function analyzeHeavenlyKingBomb() {
+      // 检查天王炸（👑和⚔是否都满足条件）
+      const hasHeavenlyKingBomb = cards['👑'] >= 2 && cards['⚔'] >= 2;
+      document.getElementById('heavenlyKingBomb').innerText = `天王炸：${hasHeavenlyKingBomb ? '有' : '无'}`;
+    }
+
+    function updateBombsDisplay() {
+      const bombLevels = [4, 5, 6, 7, 8]; // 定义炸弹级别
+      const bombElements = [
+        'fourBombs',
+        'fiveBombs',
+        'sixBombs',
+        'sevenBombs',
+        'eightBombs',
+      ]; // 对应 DOM 元素 ID
+
+      bombLevels.forEach((level, index) => {
+        const bombs = getBombs(level); // 获取当前级别的炸弹
+        document.getElementById(bombElements[index]).innerText = `${level}炸：${bombs.join(', ') || '无'}`;
+      });
+    }
+
+    function sortByCardOrder(cards) {
+      return cards.sort((a, b) => cardOrder.indexOf(a) - cardOrder.indexOf(b));
+    }
+
+    // 重置所有库存
+    function resetAll() {
+      for (const card in cards) {
+        cards[card] = card === '👑' || card === '⚔' ? 2 : 8; // 重置默认值
+      }
+      // 清空卡片容器，避免重复添加
+      const box = document.getElementById('box');
+      box.innerHTML = '';
+      initCards(); // 重新初始化卡片
+
+    }
+    // 绑定 Reset 按钮事件
+    document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+    // 页面加载完成后初始化
+    window.onload = function () {
+      initCards();
+      document.getElementById("cardInput").addEventListener("keydown", handleInput);
+      document.getElementById("resetBtn").addEventListener("click", resetAll);
+    };
+
+    document.addEventListener('dblclick', function (event) {
+      event.preventDefault();
+    }, { passive: false });
+  </script>
+</body>
+
+</html>
