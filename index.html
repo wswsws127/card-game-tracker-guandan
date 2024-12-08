@@ -203,6 +203,11 @@
     #analysisBox p {
       margin: 5px 0;
     }
+
+    #historyLog {
+      color: grey;
+      margin-top: 1rem;
+    }
   </style>
 
   <title>一键截图并识别</title>
@@ -220,6 +225,7 @@
 
 
       <button id="captureButton">一键截图并识别</button>
+      <div id="historyLog"></div>
       <p id="ocrResult">识别结果：</p>
       <script>
         document.getElementById('captureButton').addEventListener('click', async () => {
@@ -415,7 +421,7 @@
 
     function handleInput(event) {
       if (event.key === "Enter") {
-        const input = event.target.value.trim().toUpperCase(); // 将输入转换为大写
+        const input = event.target.value.replace(/\s+/g, '').toUpperCase(); // 移除所有空格并转换为大写
 
         // 定义特殊映射规则
         const specialMap = {
@@ -481,14 +487,61 @@
       }
     }
 
+    let history = [];
+
+    function updateHistoryLog(newInput) {
+      history.unshift(newInput); // Add the new input at the beginning
+      document.getElementById('historyLog').innerText = history.join(', ');
+    }
+
+    function handleInput(event) {
+      if (event.key === "Enter") {
+        const input = event.target.value.replace(/\s+/g, '').toUpperCase(); // 移除所有空格并转换为大写
+        updateHistoryLog(input); // Update the history log with the new input
+        const specialMap = {
+          '1': 'A',  // 1 代表 A
+          'D': '👑', // D 代表大王
+          'X': '⚔', // X 代表小王
+          'S': '10'  // S 代表 10
+        };
+
+        const normalizedInput = [...input].map(char => specialMap[char] || char);
+
+        const inputCounts = {};
+
+        for (let char of normalizedInput) {
+          if (cards[char] !== undefined) {
+            inputCounts[char] = (inputCounts[char] || 0) + 1;
+          } else {
+            alert(`无效输入: ${char}`);
+            return; 
+          }
+        }
+
+        for (let card in inputCounts) {
+          if (inputCounts[card] > cards[card]) {
+            alert(`库存不足: ${card} (${inputCounts[card]} 张需要，库存仅有 ${cards[card]} 张)`);
+            return;
+          }
+        }
+
+        for (let card in inputCounts) {
+          cards[card] -= inputCounts[card]; 
+          updateCardUI(card); 
+        }
+
+        event.target.value = ""; 
+
+        analyzeRemainingCards();
+      }
+    }
+
     function analyzeRemainingCards() {
-      // 获取剩余牌的数量，转为数组以便遍历
       const remainingCounts = Object.entries(cards)
         .map(([card, count]) => ({ card, count }));
 
-      // 推测三连对
       const threePairs = [];
-      for (let i = 2; i <= cardOrder.length - 3; i++) { // 遍历连续三对
+      for (let i = 2; i <= cardOrder.length - 3; i++) { 
         if (
           cards[cardOrder[i]] >= 2 &&
           cards[cardOrder[i + 1]] >= 2 &&
@@ -503,9 +556,8 @@
         }
       }
 
-      // 推测钢板
       const steelPlates = [];
-      for (let i = 2; i <= cardOrder.length - 2; i++) { // 遍历连续两组三张
+      for (let i = 2; i <= cardOrder.length - 2; i++) { 
         if (
           cards[cardOrder[i]] >= 3 &&
           cards[cardOrder[i + 1]] >= 3
@@ -518,9 +570,8 @@
         }
       }
 
-      // 推测顺子
       const sequences = [];
-      for (let i = 2; i <= cardOrder.length - 5; i++) { // 遍历顺子（连续五张）
+      for (let i = 2; i <= cardOrder.length - 5; i++) { 
         if (
           cards[cardOrder[i]] >= 1 &&
           cards[cardOrder[i + 1]] >= 1 &&
@@ -539,43 +590,38 @@
         }
       }
 
-      // 更新天王炸显示
       analyzeHeavenlyKingBomb();
 
-      // 更新炸弹显示
       updateBombsDisplay();
 
-      // 更新页面显示
       document.getElementById('threePairs').innerText = `三连对：${threePairs.join(', ') || '无'}`;
       document.getElementById('steelPlates').innerText = `钢板：${steelPlates.join(', ') || '无'}`;
       document.getElementById('sequences').innerText = `顺子：${sequences.join(', ') || '无'}`;
     }
 
     function getBombs(n) {
-      // 获取指定数量的炸弹
       return Object.entries(cards)
         .filter(([_, count]) => count >= n)
         .map(([card, count]) => `${n}个${card}`);
     }
 
     function analyzeHeavenlyKingBomb() {
-      // 检查天王炸（👑和⚔是否都满足条件）
       const hasHeavenlyKingBomb = cards['👑'] >= 2 && cards['⚔'] >= 2;
       document.getElementById('heavenlyKingBomb').innerText = `天王炸：${hasHeavenlyKingBomb ? '有' : '无'}`;
     }
 
     function updateBombsDisplay() {
-      const bombLevels = [4, 5, 6, 7, 8]; // 定义炸弹级别
+      const bombLevels = [4, 5, 6, 7, 8]; 
       const bombElements = [
         'fourBombs',
         'fiveBombs',
         'sixBombs',
         'sevenBombs',
         'eightBombs',
-      ]; // 对应 DOM 元素 ID
+      ]; 
 
       bombLevels.forEach((level, index) => {
-        const bombs = getBombs(level); // 获取当前级别的炸弹
+        const bombs = getBombs(level); 
         document.getElementById(bombElements[index]).innerText = `${level}炸：${bombs.join(', ') || '无'}`;
       });
     }
@@ -584,21 +630,21 @@
       return cards.sort((a, b) => cardOrder.indexOf(a) - cardOrder.indexOf(b));
     }
 
-    // 重置所有库存
     function resetAll() {
       for (const card in cards) {
-        cards[card] = card === '👑' || card === '⚔' ? 2 : 8; // 重置默认值
+        cards[card] = card === '👑' || card === '⚔' ? 2 : 8; // Reset to default values
       }
-      // 清空卡片容器，避免重复添加
+      // Clear the card container to avoid duplicate additions
       const box = document.getElementById('box');
       box.innerHTML = '';
-      initCards(); // 重新初始化卡片
+      initCards(); // Reinitialize cards
 
+      // Clear the history log
+      history = []; // Clear history array
+      document.getElementById('historyLog').innerText = ''; // Clear history log
     }
-    // 绑定 Reset 按钮事件
     document.getElementById('resetBtn').addEventListener('click', resetAll);
 
-    // 页面加载完成后初始化
     window.onload = function () {
       initCards();
       document.getElementById("cardInput").addEventListener("keydown", handleInput);
