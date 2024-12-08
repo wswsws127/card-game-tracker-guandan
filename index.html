@@ -10,10 +10,12 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
+      width: calc(5 * 7rem + 4 * 2rem); /* Fixed width to fit 5 cards per row with margins */
+      margin: 0 auto; /* Center the box */
     }
 
     .card {
-      flex: 0 0 calc(20% - 10px); /* 5 cards per row with some margin */
+      flex: 0 0 7rem; /* Fixed card width */
       aspect-ratio: 4 / 7; /* Maintain a 7:4 aspect ratio */
       margin: 1rem;
       max-height: 10rem;
