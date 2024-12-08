@@ -222,6 +222,10 @@
       top: 5px;
       right: 5px;
     }
+
+    .selected-card {
+      box-shadow: 0 0 10px 5px green;
+    }
   </style>
 
   <title>一键截图并识别</title>
@@ -232,39 +236,40 @@
 <body>
   <div id="box"></div>
   <div class="info">
-    <p>作者: <a href="http://www.leelei.info">GPT + wswsws125</a></p>
+    <p id="levelCardDisplay" style="display:none">级牌：</p>
+    <p>作者: <a href="http://www.leelei.info">GPT + Windsurf + wswsws127</a></p>
     <p>用法: 【点击】箭头增减牌，或直接输入牌点</p>
     <div class="input-container">
       <input id="cardInput" type="text" placeholder="输入牌点（如555666或kk），按回车减去库存">
 
 
-      <button id="captureButton">一键截图并识别</button>
+      <!-- <button id="captureButton">一键截图并识别</button> -->
       <div id="historyLog"></div>
-      <p id="ocrResult">识别结果：</p>
+      <!-- <p id="ocrResult">识别结果：</p> -->
       <script>
-        document.getElementById('captureButton').addEventListener('click', async () => {
-          try {
-            // 使用 html2canvas 截图
-            const canvas = await html2canvas(document.body); // 截图整个页面
-            const imageData = canvas.toDataURL('image/png'); // 转换为 PNG 图片
+        // document.getElementById('captureButton').addEventListener('click', async () => {
+        //   try {
+        //     // 使用 html2canvas 截图
+        //     const canvas = await html2canvas(document.body); // 截图整个页面
+        //     const imageData = canvas.toDataURL('image/png'); // 转换为 PNG 图片
 
-            // 显示加载状态
-            document.getElementById('ocrResult').innerText = '正在识别，请稍候...';
+        //     // 显示加载状态
+        //     document.getElementById('ocrResult').innerText = '正在识别，请稍候...';
 
-            // 使用 tesseract.js 进行 OCR 识别
-            const worker = Tesseract.createWorker(); // 创建 Worker
-            await worker.loadLanguage('eng'); // 加载语言包
-            await worker.initialize('eng'); // 初始化语言
+        //     // 使用 tesseract.js 进行 OCR 识别
+        //     const worker = Tesseract.createWorker(); // 创建 Worker
+        //     await worker.loadLanguage('eng'); // 加载语言包
+        //     await worker.initialize('eng'); // 初始化语言
 
-            const { data: { text } } = await worker.recognize(imageData); // 识别图片
-            document.getElementById('ocrResult').innerText = `识别结果：\n${text}`; // 显示结果
+        //     const { data: { text } } = await worker.recognize(imageData); // 识别图片
+        //     document.getElementById('ocrResult').innerText = `识别结果：\n${text}`; // 显示结果
 
-            await worker.terminate(); // 结束任务
-          } catch (error) {
-            console.error('截图或识别失败', error);
-            document.getElementById('ocrResult').innerText = '识别失败，请重试。';
-          }
-        });
+        //     await worker.terminate(); // 结束任务
+        //   } catch (error) {
+        //     console.error('截图或识别失败', error);
+        //     document.getElementById('ocrResult').innerText = '识别失败，请重试。';
+        //   }
+        // });
 
       </script>
 
@@ -331,6 +336,7 @@
     function initCards() {
       let box = document.getElementById('box');
       let frag = document.createDocumentFragment();
+      let levelCard = null;
 
       // 按照 cardOrder 的顺序遍历
       for (let i = 0; i < cardOrder.length; i++) {
@@ -386,6 +392,30 @@
         btnContainer.appendChild(decreaseBtn);
 
         ele.appendChild(btnContainer);
+
+        let pressTimer;
+
+        ele.addEventListener('mousedown', (event) => {
+          if (event.button === 0) { // check for left-click
+            pressTimer = setTimeout(() => {
+              if (levelCard) {
+                levelCard.classList.remove('selected-card');
+              }
+              levelCard = ele;
+              levelCard.classList.add('selected-card');
+              document.getElementById('levelCardDisplay').style.display = 'block';
+              document.getElementById('levelCardDisplay').innerText = `级牌：${cardName}`;
+            }, 500); // 0.5 second threshold
+          }
+        });
+
+        ele.addEventListener('mouseup', (event) => {
+          clearTimeout(pressTimer);
+        });
+
+        ele.addEventListener('mouseleave', (event) => {
+          clearTimeout(pressTimer);
+        });
 
         // 添加卡片到文档片段
         frag.appendChild(ele);
@@ -671,6 +701,16 @@
       // Clear the history log
       history = []; // Clear history array
       document.getElementById('historyLog').innerText = ''; // Clear history log
+
+      // Remove selection and hide level card display
+      const levelCardDisplay = document.getElementById('levelCardDisplay');
+      levelCardDisplay.style.display = 'none';
+      levelCardDisplay.innerText = '';
+
+      const selectedCard = document.querySelector('.selected-card');
+      if (selectedCard) {
+        selectedCard.classList.remove('selected-card');
+      }
     }
     document.getElementById('resetBtn').addEventListener('click', resetAll);
 
